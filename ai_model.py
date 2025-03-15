@@ -12,7 +12,9 @@ def analyze_activity_patterns(activity_logs):
             'rapid_typing': 0,
             'unusual_mouse': 0,
             'tab_switches': 0,
-            'time_gaps': 0
+            'time_gaps': 0,
+            'right_clicks': 0,
+            'suspicious_patterns': 0
         }
 
         for i, log in enumerate(activity_logs):
@@ -24,10 +26,26 @@ def analyze_activity_patterns(activity_logs):
                 if log.data.get('keyInterval', 1000) < 50:  # milliseconds
                     patterns['rapid_typing'] += 1
 
+                # Check for suspicious typing patterns
+                log_patterns = log.data.get('patterns', {})
+                if log_patterns.get('consistentPattern'):
+                    patterns['suspicious_patterns'] += 1
+
             elif log.activity_type == 'mouse':
                 # Check for unusual mouse movements
                 if log.data.get('speed', 0) > 1000:  # pixels/sec
                     patterns['unusual_mouse'] += 1
+
+                # Check for suspicious mouse patterns
+                mouse_pattern = log.data.get('pattern', {})
+                if mouse_pattern.get('isLinear') or mouse_pattern.get('isCircular'):
+                    patterns['suspicious_patterns'] += 1
+                if mouse_pattern.get('suddenJumps', 0) > 0:
+                    patterns['unusual_mouse'] += mouse_pattern['suddenJumps']
+
+            elif log.activity_type == 'right_click':
+                if log.data.get('timeSinceLastClick', 1000) < 200:  # milliseconds
+                    patterns['right_clicks'] += 1
 
             elif log.activity_type == 'tabswitch':
                 patterns['tab_switches'] += 1
@@ -41,18 +59,21 @@ def analyze_activity_patterns(activity_logs):
         return patterns
     except Exception as e:
         logging.error(f"Error in analyze_activity_patterns: {str(e)}")
-        return {'rapid_typing': 0, 'unusual_mouse': 0, 'tab_switches': 0, 'time_gaps': 0}
+        return {'rapid_typing': 0, 'unusual_mouse': 0, 'tab_switches': 0, 
+                'time_gaps': 0, 'right_clicks': 0, 'suspicious_patterns': 0}
 
 def extract_features(activity_logs):
     """Extract features from activity logs for anomaly detection"""
     try:
         if not activity_logs:
-            return np.zeros((1, 10))
+            return np.zeros((1, 15))  # Increased feature set
 
         # Basic features
         keystroke_intervals = []
         mouse_speeds = []
+        right_clicks = []
         tab_switches = 0
+        suspicious_patterns = 0
 
         for log in activity_logs:
             if not log.data:  # Skip if data is None
@@ -63,10 +84,25 @@ def extract_features(activity_logs):
                 if interval is not None:
                     keystroke_intervals.append(min(float(interval), 1000))
 
+                # Check for patterns
+                patterns = log.data.get('patterns', {})
+                if patterns.get('consistentPattern'):
+                    suspicious_patterns += 1
+
             elif log.activity_type == 'mouse':
                 speed = log.data.get('speed')
                 if speed is not None:
                     mouse_speeds.append(min(float(speed), 2000))
+
+                # Check mouse patterns
+                pattern = log.data.get('pattern', {})
+                if pattern.get('isLinear') or pattern.get('isCircular'):
+                    suspicious_patterns += 1
+
+            elif log.activity_type == 'right_click':
+                time_since_last = log.data.get('timeSinceLastClick')
+                if time_since_last is not None:
+                    right_clicks.append(min(float(time_since_last), 2000))
 
             elif log.activity_type == 'tabswitch':
                 tab_switches += 1
@@ -77,18 +113,23 @@ def extract_features(activity_logs):
             np.std(keystroke_intervals) if len(keystroke_intervals) > 1 else 0,
             np.mean(mouse_speeds) if mouse_speeds else 0,
             np.std(mouse_speeds) if len(mouse_speeds) > 1 else 0,
+            np.mean(right_clicks) if right_clicks else 0,
+            np.std(right_clicks) if len(right_clicks) > 1 else 0,
             tab_switches,
             len(activity_logs),
             len(keystroke_intervals),
             len(mouse_speeds),
+            len(right_clicks),
             max(keystroke_intervals) if keystroke_intervals else 0,
-            max(mouse_speeds) if mouse_speeds else 0
+            max(mouse_speeds) if mouse_speeds else 0,
+            max(right_clicks) if right_clicks else 0,
+            suspicious_patterns
         ]
 
         return np.array(features).reshape(1, -1)
     except Exception as e:
         logging.error(f"Error in extract_features: {str(e)}")
-        return np.zeros((1, 10))
+        return np.zeros((1, 15))
 
 def compute_risk_score(session_id):
     """Compute comprehensive risk score using Isolation Forest"""
@@ -123,7 +164,9 @@ def compute_risk_score(session_id):
             patterns['rapid_typing'] * 0.02 +
             patterns['unusual_mouse'] * 0.02 +
             patterns['tab_switches'] * 0.03 +
-            patterns['time_gaps'] * 0.05
+            patterns['time_gaps'] * 0.05 +
+            patterns['right_clicks'] * 0.04 +
+            patterns['suspicious_patterns'] * 0.05
         )
 
         # Convert to 0-1 scale where 1 is high risk
