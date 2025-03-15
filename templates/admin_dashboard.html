@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block head %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}" defer></script>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <h2 class="mb-4">Exam Monitoring Dashboard</h2>
+    
+    <div class="row">
+        <div class="col-12 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Risk Score Trends</h5>
+                    <canvas id="risk-trends"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-12">
+            <h3>Active Sessions</h3>
+            <div id="active-sessions">
+                <!-- Active sessions will be populated here -->
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Risk Level Legend</h5>
+                    <div class="d-flex justify-content-around">
+                        <div class="risk-indicator low-risk">Low Risk (0-40%)</div>
+                        <div class="risk-indicator medium-risk">Medium Risk (41-70%)</div>
+                        <div class="risk-indicator high-risk">High Risk (71-100%)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

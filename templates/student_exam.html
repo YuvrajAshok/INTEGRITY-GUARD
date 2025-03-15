@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block head %}
+<script src="{{ url_for('static', filename='js/monitor.js') }}" defer></script>
+{% endblock %}
+
+{% block content %}
+<div class="exam-container">
+    <div id="risk-score" class="risk-score low-risk">
+        Risk Score: 0%
+    </div>
+    
+    <div class="card">
+        <div class="card-body">
+            <h2 class="card-title">Sample Exam</h2>
+            
+            <form id="exam-form" onsubmit="event.preventDefault(); window.examMonitor.submitExam();">
+                <div class="mb-4">
+                    <label class="form-label">Question 1:</label>
+                    <p>Explain the concept of machine learning in your own words.</p>
+                    <textarea class="form-control" rows="5" required></textarea>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="form-label">Question 2:</label>
+                    <p>What are the key differences between supervised and unsupervised learning?</p>
+                    <textarea class="form-control" rows="5" required></textarea>
+                </div>
+                
+                <div class="mb-4">
+                    <label class="form-label">Question 3:</label>
+                    <p>Describe a real-world application of artificial intelligence.</p>
+                    <textarea class="form-control" rows="5" required></textarea>
+                </div>
+                
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    Warning: Your actions are being monitored. Suspicious behavior will be flagged.
+                </div>
+                
+                <button type="submit" class="btn btn-primary">Submit Exam</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

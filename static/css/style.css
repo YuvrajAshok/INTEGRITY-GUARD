@@ -1,0 +1,78 @@
+/* Theme variables */
+:root {
+    --risk-low: var(--bs-success);
+    --risk-medium: var(--bs-warning);
+    --risk-high: var(--bs-danger);
+}
+
+/* Common styles */
+body {
+    min-height: 100vh;
+    background-color: var(--bs-dark);
+    color: var(--bs-light);
+}
+
+.container {
+    padding: 2rem;
+}
+
+/* Exam interface */
+.exam-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.risk-score {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0.25rem;
+    font-weight: bold;
+}
+
+.low-risk {
+    background-color: var(--risk-low);
+    color: var(--bs-dark);
+}
+
+.medium-risk {
+    background-color: var(--risk-medium);
+    color: var(--bs-dark);
+}
+
+.high-risk {
+    background-color: var(--risk-high);
+    color: var(--bs-light);
+}
+
+/* Dashboard styles */
+.session-card {
+    margin-bottom: 1rem;
+}
+
+.risk-indicator {
+    padding: 0.5rem;
+    margin: 1rem 0;
+    border-radius: 0.25rem;
+    text-align: center;
+    font-weight: bold;
+}
+
+#risk-trends {
+    background-color: var(--bs-dark);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 2rem;
+}
+
+/* Login form */
+.login-container {
+    max-width: 400px;
+    margin: 5rem auto;
+    padding: 2rem;
+    background-color: var(--bs-dark);
+    border-radius: 0.5rem;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+}
