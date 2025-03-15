@@ -54,48 +54,73 @@ def start_exam():
 
 @app.route('/api/log_activity', methods=['POST'])
 def log_activity():
-    data = request.json
-    session_id = data.get('session_id')
+    try:
+        data = request.json
+        session_id = data.get('session_id')
 
-    activity_log = ActivityLog(
-        session_id=session_id,
-        activity_type=data.get('type'),
-        timestamp=datetime.utcnow(),
-        data=data.get('data')
-    )
-    db.session.add(activity_log)
+        if not session_id:
+            return jsonify({'error': 'Missing session_id'}), 400
 
-    # Compute new risk score
-    risk_value = compute_risk_score(session_id)
-    risk_score = RiskScore(
-        session_id=session_id,
-        score=risk_value,
-        timestamp=datetime.utcnow()
-    )
-    db.session.add(risk_score)
+        # Create activity log
+        activity_log = ActivityLog(
+            session_id=session_id,
+            activity_type=data.get('type'),
+            timestamp=datetime.utcnow(),
+            data=data.get('data', {})
+        )
+        db.session.add(activity_log)
 
-    # Update mean risk score
-    exam_session = ExamSession.query.get(session_id)
-    all_scores = RiskScore.query.filter_by(session_id=session_id).all()
-    mean_score = sum(score.score for score in all_scores) / len(all_scores) if all_scores else risk_value
-    exam_session.mean_risk_score = mean_score
+        # Compute new risk score
+        risk_value = compute_risk_score(session_id)
+        risk_score = RiskScore(
+            session_id=session_id,
+            score=risk_value,
+            timestamp=datetime.utcnow()
+        )
+        db.session.add(risk_score)
 
-    db.session.commit()
+        # Update mean risk score
+        exam_session = ExamSession.query.get(session_id)
+        if exam_session:
+            all_scores = RiskScore.query.filter_by(session_id=session_id).all()
+            if all_scores:
+                mean_score = sum(score.score for score in all_scores) / len(all_scores)
+                exam_session.mean_risk_score = mean_score
+            else:
+                exam_session.mean_risk_score = risk_value
 
-    return jsonify({'risk_score': risk_value})
+        db.session.commit()
+
+        return jsonify({
+            'risk_score': risk_value,
+            'mean_risk_score': exam_session.mean_risk_score if exam_session else risk_value
+        })
+
+    except Exception as e:
+        logging.error(f"Error in log_activity: {str(e)}")
+        db.session.rollback()
+        return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/api/risk_score/<int:session_id>')
 def get_risk_score(session_id):
-    latest_score = RiskScore.query.filter_by(session_id=session_id)\
-        .order_by(RiskScore.timestamp.desc()).first()
-    
-    if not latest_score:
-        return jsonify({'error': 'No risk score found'}), 404
-        
-    return jsonify({
-        'score': latest_score.score,
-        'timestamp': latest_score.timestamp.isoformat()
-    })
+    try:
+        latest_score = RiskScore.query.filter_by(session_id=session_id)\
+            .order_by(RiskScore.timestamp.desc()).first()
+
+        exam_session = ExamSession.query.get(session_id)
+
+        if not latest_score:
+            return jsonify({'error': 'No risk score found'}), 404
+
+        return jsonify({
+            'score': latest_score.score,
+            'mean_score': exam_session.mean_risk_score if exam_session else latest_score.score,
+            'timestamp': latest_score.timestamp.isoformat()
+        })
+
+    except Exception as e:
+        logging.error(f"Error in get_risk_score: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/api/submit_exam', methods=['POST'])
 def submit_exam():
