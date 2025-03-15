@@ -1,9 +1,10 @@
 import os
 import logging
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
 from datetime import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -103,6 +104,68 @@ def submit_exam():
     db.session.commit()
     
     return jsonify({'status': 'completed'})
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        email = request.form.get('email')
+        is_admin = request.form.get('is_admin') == 'on'
+
+        # Check if user already exists
+        user = User.query.filter_by(username=username).first()
+        if user:
+            flash('Username already exists')
+            return redirect(url_for('register'))
+
+        email_exists = User.query.filter_by(email=email).first()
+        if email_exists:
+            flash('Email already registered')
+            return redirect(url_for('register'))
+
+        # Create new user
+        new_user = User(
+            username=username,
+            email=email,
+            password_hash=generate_password_hash(password),
+            is_admin=is_admin
+        )
+
+        db.session.add(new_user)
+        db.session.commit()
+
+        flash('Registration successful! Please login.')
+        return redirect(url_for('index'))
+
+    return render_template('register.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        is_admin = request.form.get('is_admin') == 'on'
+
+        user = User.query.filter_by(username=username).first()
+
+        if user and check_password_hash(user.password_hash, password):
+            if is_admin and not user.is_admin:
+                flash('Unauthorized access to admin dashboard')
+                return redirect(url_for('login'))
+
+            session['user_id'] = user.id
+            if user.is_admin:
+                return redirect(url_for('admin_dashboard'))
+            return redirect(url_for('student_exam'))
+
+        flash('Invalid username or password')
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.pop('user_id', None)
+    return redirect(url_for('index'))
 
 with app.app_context():
     db.create_all()
