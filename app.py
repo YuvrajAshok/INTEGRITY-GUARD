@@ -167,5 +167,43 @@ def logout():
     session.pop('user_id', None)
     return redirect(url_for('index'))
 
+@app.route('/api/active_sessions')
+def get_active_sessions():
+    # Get all active exam sessions
+    active_sessions = ExamSession.query.filter_by(completed=False)\
+        .order_by(ExamSession.start_time.desc()).all()
+
+    session_data = []
+    for session in active_sessions:
+        # Get latest risk score
+        latest_score = RiskScore.query.filter_by(session_id=session.id)\
+            .order_by(RiskScore.timestamp.desc()).first()
+
+        # Get recent suspicious activities
+        recent_logs = ActivityLog.query.filter_by(session_id=session.id)\
+            .order_by(ActivityLog.timestamp.desc())\
+            .limit(5).all()
+
+        # Get student info
+        student = User.query.get(session.user_id)
+
+        session_data.append({
+            'id': session.id,
+            'username': student.username,
+            'start_time': session.start_time.isoformat(),
+            'duration': int((datetime.utcnow() - session.start_time).total_seconds()),
+            'risk_score': latest_score.score if latest_score else 0.0,
+            'suspicious_activities': [
+                {
+                    'type': log.activity_type,
+                    'timestamp': log.timestamp.isoformat(),
+                    'data': log.data
+                } for log in recent_logs
+            ]
+        })
+
+    return jsonify(session_data)
+
+
 with app.app_context():
     db.create_all()

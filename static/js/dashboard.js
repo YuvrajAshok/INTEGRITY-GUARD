@@ -4,12 +4,12 @@ class AdminDashboard {
         this.charts = new Map();
         this.initializeDashboard();
     }
-    
+
     async initializeDashboard() {
         this.setupCharts();
         this.startMonitoring();
     }
-    
+
     setupCharts() {
         const ctx = document.getElementById('risk-trends').getContext('2d');
         this.riskChart = new Chart(ctx, {
@@ -28,56 +28,94 @@ class AdminDashboard {
                 },
                 plugins: {
                     legend: {
-                        position: 'top'
+                        position: 'top',
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const score = context.raw;
+                                let riskLevel = score > 0.7 ? 'High Risk' :
+                                              score > 0.4 ? 'Medium Risk' : 'Low Risk';
+                                return `Risk Score: ${(score * 100).toFixed(1)}% (${riskLevel})`;
+                            }
+                        }
                     }
                 }
             }
         });
     }
-    
+
     async startMonitoring() {
-        // Poll for active sessions and their risk scores
-        setInterval(async () => {
-            const activeSessions = await this.fetchActiveSessions();
-            this.updateDashboard(activeSessions);
-        }, 5000);
+        await this.updateActiveSessions();
+        setInterval(() => this.updateActiveSessions(), 5000);
     }
-    
-    async fetchActiveSessions() {
+
+    async updateActiveSessions() {
         try {
             const response = await fetch('/api/active_sessions');
-            return await response.json();
+            if (!response.ok) throw new Error('Failed to fetch sessions');
+            const sessions = await response.json();
+            this.updateDashboard(sessions);
         } catch (error) {
             console.error('Failed to fetch active sessions:', error);
-            return [];
         }
     }
-    
+
     updateDashboard(sessions) {
         const container = document.getElementById('active-sessions');
         container.innerHTML = '';
-        
+
         sessions.forEach(session => {
             const sessionElement = this.createSessionElement(session);
             container.appendChild(sessionElement);
-            
             this.updateRiskChart(session);
         });
     }
-    
+
     createSessionElement(session) {
         const div = document.createElement('div');
         div.className = 'session-card';
+
+        const suspiciousActivities = session.suspicious_activities
+            .map(activity => {
+                const time = new Date(activity.timestamp).toLocaleTimeString();
+                let description = '';
+
+                if (activity.type === 'keystroke' && activity.data.keyInterval < 50) {
+                    description = 'Unusually rapid typing detected';
+                } else if (activity.type === 'mouse' && activity.data.speed > 1000) {
+                    description = 'Suspicious mouse movement pattern';
+                } else if (activity.type === 'tabswitch') {
+                    description = 'Tab switching detected';
+                }
+
+                return `<li class="list-group-item">
+                    ${time} - ${description}
+                </li>`;
+            })
+            .join('');
+
         div.innerHTML = `
             <div class="card mb-3">
                 <div class="card-body">
-                    <h5 class="card-title">Student: ${session.username}</h5>
-                    <p class="card-text">Session ID: ${session.id}</p>
-                    <p class="card-text">Duration: ${this.formatDuration(session.duration)}</p>
-                    <div class="risk-indicator ${this.getRiskClass(session.risk_score)}">
-                        Risk Score: ${(session.risk_score * 100).toFixed(1)}%
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title">Student: ${session.username}</h5>
+                        <span class="badge ${this.getRiskBadgeClass(session.risk_score)}">
+                            Risk Score: ${(session.risk_score * 100).toFixed(1)}%
+                        </span>
                     </div>
-                    <button class="btn btn-warning" onclick="dashboard.flagSession(${session.id})">
+                    <p class="card-text">
+                        <small class="text-muted">
+                            Session Duration: ${this.formatDuration(session.duration)}
+                        </small>
+                    </p>
+                    <div class="suspicious-activities mt-3">
+                        <h6>Recent Suspicious Activities:</h6>
+                        <ul class="list-group list-group-flush">
+                            ${suspiciousActivities || '<li class="list-group-item">No suspicious activities detected</li>'}
+                        </ul>
+                    </div>
+                    <button class="btn btn-warning mt-3" onclick="dashboard.flagSession(${session.id})">
                         Flag for Review
                     </button>
                 </div>
@@ -85,14 +123,20 @@ class AdminDashboard {
         `;
         return div;
     }
-    
+
+    getRiskBadgeClass(score) {
+        if (score > 0.7) return 'bg-danger';
+        if (score > 0.4) return 'bg-warning text-dark';
+        return 'bg-success';
+    }
+
     updateRiskChart(session) {
-        const dataset = this.riskChart.data.datasets.find(ds => ds.label === `Student ${session.id}`);
-        
+        const dataset = this.riskChart.data.datasets.find(ds => ds.label === `Student ${session.username}`);
+
         if (!dataset) {
             // Add new dataset for this session
             this.riskChart.data.datasets.push({
-                label: `Student ${session.id}`,
+                label: `Student ${session.username}`,
                 data: [session.risk_score],
                 borderColor: this.getRandomColor(),
                 fill: false
@@ -103,15 +147,15 @@ class AdminDashboard {
                 dataset.data.shift();
             }
         }
-        
+
         // Update labels
         if (this.riskChart.data.labels.length === 0) {
             this.riskChart.data.labels = [...Array(20)].map((_, i) => i.toString());
         }
-        
+
         this.riskChart.update();
     }
-    
+
     getRandomColor() {
         const letters = '0123456789ABCDEF';
         let color = '#';
@@ -120,19 +164,13 @@ class AdminDashboard {
         }
         return color;
     }
-    
-    getRiskClass(score) {
-        if (score > 0.7) return 'high-risk';
-        if (score > 0.4) return 'medium-risk';
-        return 'low-risk';
-    }
-    
+
     formatDuration(seconds) {
         const minutes = Math.floor(seconds / 60);
         const remainingSeconds = seconds % 60;
         return `${minutes}m ${remainingSeconds}s`;
     }
-    
+
     async flagSession(sessionId) {
         try {
             await fetch('/api/flag_session', {
@@ -142,14 +180,14 @@ class AdminDashboard {
                 },
                 body: JSON.stringify({ session_id: sessionId })
             });
-            
+
             // Visual feedback
             const button = document.querySelector(`button[onclick="dashboard.flagSession(${sessionId})"]`);
             button.classList.remove('btn-warning');
             button.classList.add('btn-danger');
             button.textContent = 'Flagged';
             button.disabled = true;
-            
+
         } catch (error) {
             console.error('Failed to flag session:', error);
         }
