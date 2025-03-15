@@ -1,0 +1,60 @@
+Build a Flask-based website that allows users to take an online exam while monitoring their behavior (keystroke dynamics, mouse movements, and tab switches). The system computes a real-time risk score and stores user interaction data in a Flask-SQLAlchemy database.
+
+Requirements:
+Backend: Flask + Flask-SQLAlchemy
+
+Create a RESTful API with Flask to handle exam sessions, user activity logging, and risk score computation.
+Use SQLAlchemy for database interactions, storing user behavior logs and risk scores.
+Implement routes for:
+POST /start_exam → Initializes a new session.
+POST /log_activity → Logs keystrokes, mouse events, and focus changes.
+GET /risk_score → Returns the current risk score.
+POST /submit_exam → Ends the session and stores final data.
+Frontend: HTML, CSS, JavaScript
+
+Build a simple exam interface where users answer questions while JavaScript tracks behavior (keystroke timing, mouse movement, tab switching).
+The interface should send activity logs to the Flask API in real-time using fetch() or WebSockets.
+Database: Flask-SQLAlchemy (PostgreSQL or SQLite)
+
+Store user interaction logs with timestamps.
+Maintain a table for user risk scores, updating dynamically based on detected anomalies.
+Risk-Based AI Model (Simple ML Approach in Python)
+
+Use Scikit-learn to implement an anomaly detection model (e.g., Isolation Forest or One-Class SVM) to detect irregular behavior.
+Compute and update the risk score in real-time based on user activity logs.
+Real-Time Monitoring Dashboard
+
+Create an instructor dashboard in React (or simple Flask+Jinja template) to display live student risk scores during exams.
+Allow instructors to flag suspicious activities for review.
+Expected Code Structure in Replit:
+bash
+Copy
+Edit
+/project-root  
+│── app.py  # Main Flask app  
+│── models.py  # Database models  
+│── routes.py  # API routes for logging activity & risk scores  
+│── static/  
+│   ├── styles.css  # CSS for frontend  
+│   ├── script.js  # JavaScript for tracking user behavior  
+│── templates/  
+│   ├── index.html  # Exam interface  
+│   ├── dashboard.html  # Instructor dashboard  
+│── ai_model.py  # ML-based risk scoring logic  
+│── database.db  # SQLite database (or configure PostgreSQL)  
+│── requirements.txt  # Dependencies  
+│── README.md  # Project setup guide  
+Technology Stack:
+Flask → Backend API
+Flask-SQLAlchemy → Database ORM
+JavaScript (vanilla or React) → Frontend
+Scikit-learn → Anomaly detection model for risk scoring
+SQLite/PostgreSQL → Data storage
+Bootstrap/Tailwind CSS → UI Styling
+Extra Instructions for Replit:
+Generate a basic working prototype that:
+Allows users to take an online exam.
+Tracks keystrokes, mouse movements, and tab switches in the background.
+Sends activity logs to the Flask API.
+Computes a real-time risk score and updates the UI.
+Displays live exam monitoring in the instructor dashboard.
