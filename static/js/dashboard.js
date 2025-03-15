@@ -35,7 +35,7 @@ class AdminDashboard {
                             label: function(context) {
                                 const score = context.raw;
                                 let riskLevel = score > 0.7 ? 'High Risk' :
-                                              score > 0.4 ? 'Medium Risk' : 'Low Risk';
+                                             score > 0.4 ? 'Medium Risk' : 'Low Risk';
                                 return `Risk Score: ${(score * 100).toFixed(1)}% (${riskLevel})`;
                             }
                         }
@@ -47,7 +47,8 @@ class AdminDashboard {
 
     async startMonitoring() {
         await this.updateActiveSessions();
-        setInterval(() => this.updateActiveSessions(), 5000);
+        // Update every 3 seconds to match student monitoring frequency
+        setInterval(() => this.updateActiveSessions(), 3000);
     }
 
     async updateActiveSessions() {
@@ -87,6 +88,8 @@ class AdminDashboard {
                     description = 'Suspicious mouse movement pattern';
                 } else if (activity.type === 'tabswitch') {
                     description = 'Tab switching detected';
+                } else if (activity.type === 'right_click') {
+                    description = 'Rapid right-clicking detected';
                 }
 
                 return `<li class="list-group-item">
