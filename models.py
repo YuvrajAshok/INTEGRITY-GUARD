@@ -8,7 +8,7 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(256))
     is_admin = db.Column(db.Boolean, default=False)
-    
+
     exam_sessions = db.relationship('ExamSession', backref='user', lazy=True)
 
 class ExamSession(db.Model):
@@ -17,7 +17,8 @@ class ExamSession(db.Model):
     start_time = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     end_time = db.Column(db.DateTime)
     completed = db.Column(db.Boolean, default=False)
-    
+    mean_risk_score = db.Column(db.Float, default=0.0)  # Added mean risk score
+
     activity_logs = db.relationship('ActivityLog', backref='session', lazy=True)
     risk_scores = db.relationship('RiskScore', backref='session', lazy=True)
 

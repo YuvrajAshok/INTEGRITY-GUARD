@@ -56,7 +56,7 @@ def start_exam():
 def log_activity():
     data = request.json
     session_id = data.get('session_id')
-    
+
     activity_log = ActivityLog(
         session_id=session_id,
         activity_type=data.get('type'),
@@ -64,7 +64,7 @@ def log_activity():
         data=data.get('data')
     )
     db.session.add(activity_log)
-    
+
     # Compute new risk score
     risk_value = compute_risk_score(session_id)
     risk_score = RiskScore(
@@ -73,8 +73,15 @@ def log_activity():
         timestamp=datetime.utcnow()
     )
     db.session.add(risk_score)
+
+    # Update mean risk score
+    exam_session = ExamSession.query.get(session_id)
+    all_scores = RiskScore.query.filter_by(session_id=session_id).all()
+    mean_score = sum(score.score for score in all_scores) / len(all_scores) if all_scores else risk_value
+    exam_session.mean_risk_score = mean_score
+
     db.session.commit()
-    
+
     return jsonify({'risk_score': risk_value})
 
 @app.route('/api/risk_score/<int:session_id>')
@@ -204,6 +211,29 @@ def get_active_sessions():
 
     return jsonify(session_data)
 
+@app.route('/api/end_session', methods=['POST'])
+def end_session():
+    data = request.json
+    session_id = data.get('session_id')
+
+    exam_session = ExamSession.query.get(session_id)
+    if not exam_session:
+        return jsonify({'error': 'Session not found'}), 404
+
+    exam_session.end_time = datetime.utcnow()
+    exam_session.completed = True
+
+    # Calculate final mean risk score
+    all_scores = RiskScore.query.filter_by(session_id=session_id).all()
+    if all_scores:
+        exam_session.mean_risk_score = sum(score.score for score in all_scores) / len(all_scores)
+
+    db.session.commit()
+
+    return jsonify({
+        'status': 'completed',
+        'mean_risk_score': exam_session.mean_risk_score
+    })
 
 with app.app_context():
     db.create_all()

@@ -100,9 +100,14 @@ class AdminDashboard {
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
                         <h5 class="card-title">Student: ${session.username}</h5>
-                        <span class="badge ${this.getRiskBadgeClass(session.risk_score)}">
-                            Risk Score: ${(session.risk_score * 100).toFixed(1)}%
-                        </span>
+                        <div>
+                            <span class="badge ${this.getRiskBadgeClass(session.risk_score)}">
+                                Current Risk: ${(session.risk_score * 100).toFixed(1)}%
+                            </span>
+                            <span class="badge bg-info ms-2">
+                                Mean Risk: ${(session.mean_risk_score * 100).toFixed(1)}%
+                            </span>
+                        </div>
                     </div>
                     <p class="card-text">
                         <small class="text-muted">
@@ -115,8 +120,8 @@ class AdminDashboard {
                             ${suspiciousActivities || '<li class="list-group-item">No suspicious activities detected</li>'}
                         </ul>
                     </div>
-                    <button class="btn btn-warning mt-3" onclick="dashboard.flagSession(${session.id})">
-                        Flag for Review
+                    <button class="btn btn-danger mt-3" onclick="dashboard.endSession(${session.id})">
+                        End Session
                     </button>
                 </div>
             </div>
@@ -171,9 +176,9 @@ class AdminDashboard {
         return `${minutes}m ${remainingSeconds}s`;
     }
 
-    async flagSession(sessionId) {
+    async endSession(sessionId) {
         try {
-            await fetch('/api/flag_session', {
+            const response = await fetch('/api/end_session', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -181,15 +186,13 @@ class AdminDashboard {
                 body: JSON.stringify({ session_id: sessionId })
             });
 
-            // Visual feedback
-            const button = document.querySelector(`button[onclick="dashboard.flagSession(${sessionId})"]`);
-            button.classList.remove('btn-warning');
-            button.classList.add('btn-danger');
-            button.textContent = 'Flagged';
-            button.disabled = true;
+            if (response.ok) {
+                // Remove the session from the dashboard
+                await this.updateActiveSessions();
+            }
 
         } catch (error) {
-            console.error('Failed to flag session:', error);
+            console.error('Failed to end session:', error);
         }
     }
 }
