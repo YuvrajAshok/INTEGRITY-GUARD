@@ -18,43 +18,36 @@ def analyze_activity_patterns(activity_logs):
         }
 
         for i, log in enumerate(activity_logs):
-            if not log.data:  # Skip if data is None
+            if not log.data:
                 continue
 
             if log.activity_type == 'keystroke':
-                # Check for unusually fast typing
-                if log.data.get('keyInterval', 1000) < 50:  # milliseconds
-                    patterns['rapid_typing'] += 1
-
-                # Check for suspicious typing patterns
-                log_patterns = log.data.get('patterns', {})
-                if log_patterns.get('consistentPattern'):
-                    patterns['suspicious_patterns'] += 1
+                if log.data.get('keyInterval', 1000) < 50:
+                    patterns['rapid_typing'] += 2  # Increased weight
+                if log.data.get('patterns', {}).get('consistentPattern'):
+                    patterns['suspicious_patterns'] += 2
 
             elif log.activity_type == 'mouse':
-                # Check for unusual mouse movements
-                if log.data.get('speed', 0) > 1000:  # pixels/sec
-                    patterns['unusual_mouse'] += 1
+                if log.data.get('speed', 0) > 800:  # Lowered threshold
+                    patterns['unusual_mouse'] += 2
 
-                # Check for suspicious mouse patterns
-                mouse_pattern = log.data.get('pattern', {})
-                if mouse_pattern.get('isLinear') or mouse_pattern.get('isCircular'):
-                    patterns['suspicious_patterns'] += 1
-                if mouse_pattern.get('suddenJumps', 0) > 0:
-                    patterns['unusual_mouse'] += mouse_pattern['suddenJumps']
+                pattern = log.data.get('pattern', {})
+                if pattern.get('isLinear') or pattern.get('isCircular'):
+                    patterns['suspicious_patterns'] += 2
+                if pattern.get('suddenJumps', 0) > 0:
+                    patterns['unusual_mouse'] += pattern['suddenJumps'] * 2
 
             elif log.activity_type == 'right_click':
-                if log.data.get('timeSinceLastClick', 1000) < 200:  # milliseconds
-                    patterns['right_clicks'] += 1
+                if log.data.get('timeSinceLastClick', 1000) < 300:
+                    patterns['right_clicks'] += 2
 
             elif log.activity_type == 'tabswitch':
-                patterns['tab_switches'] += 1
+                patterns['tab_switches'] += 2
 
-            # Check for suspicious time gaps
             if i > 0 and activity_logs[i-1].timestamp:
                 time_gap = (log.timestamp - activity_logs[i-1].timestamp).total_seconds()
-                if time_gap > 30:  # 30 seconds gap
-                    patterns['time_gaps'] += 1
+                if time_gap > 20:  # Lowered threshold
+                    patterns['time_gaps'] += 2
 
         return patterns
     except Exception as e:
@@ -64,82 +57,82 @@ def analyze_activity_patterns(activity_logs):
 
 def calculate_risk_level(patterns):
     """Calculate risk level based on frequency of suspicious activities"""
-    # Define thresholds for each pattern type - lowered thresholds for more sensitivity
     thresholds = {
         'rapid_typing': {'low': 2, 'medium': 4, 'high': 6},
-        'unusual_mouse': {'low': 1, 'medium': 3, 'high': 5},
-        'tab_switches': {'low': 1, 'medium': 2, 'high': 4},
-        'time_gaps': {'low': 1, 'medium': 2, 'high': 3},
-        'right_clicks': {'low': 1, 'medium': 3, 'high': 5},
-        'suspicious_patterns': {'low': 1, 'medium': 2, 'high': 3}
+        'unusual_mouse': {'low': 2, 'medium': 4, 'high': 6},
+        'tab_switches': {'low': 2, 'medium': 4, 'high': 6},
+        'time_gaps': {'low': 2, 'medium': 4, 'high': 6},
+        'right_clicks': {'low': 2, 'medium': 4, 'high': 6},
+        'suspicious_patterns': {'low': 2, 'medium': 4, 'high': 6}
     }
 
-    # Calculate risk level for each pattern with higher risk values
     risk_levels = {}
     for pattern, count in patterns.items():
         if pattern in thresholds:
             if count >= thresholds[pattern]['high']:
-                risk_levels[pattern] = 1.0  # High risk
+                risk_levels[pattern] = 1.0
             elif count >= thresholds[pattern]['medium']:
-                risk_levels[pattern] = 0.7  # Medium risk (increased from 0.6)
+                risk_levels[pattern] = 0.75  # Increased from 0.7
             elif count >= thresholds[pattern]['low']:
-                risk_levels[pattern] = 0.4  # Low risk (increased from 0.3)
+                risk_levels[pattern] = 0.5   # Increased from 0.4
             else:
-                risk_levels[pattern] = 0.0  # No risk
+                risk_levels[pattern] = 0.25  # Base risk level
 
-    # Calculate weighted average risk score with adjusted weights
+    # Equal weights for all patterns for more balanced detection
     weights = {
-        'rapid_typing': 0.25,
-        'unusual_mouse': 0.25,
-        'tab_switches': 0.15,
-        'time_gaps': 0.15,
-        'right_clicks': 0.10,
-        'suspicious_patterns': 0.10
+        'rapid_typing': 1/6,
+        'unusual_mouse': 1/6,
+        'tab_switches': 1/6,
+        'time_gaps': 1/6,
+        'right_clicks': 1/6,
+        'suspicious_patterns': 1/6
     }
 
-    total_risk = sum(risk_levels[pattern] * weights[pattern] 
-                    for pattern in risk_levels.keys())
+    total_risk = sum(risk_levels[pattern] * weights[pattern] for pattern in risk_levels.keys())
 
-    # Apply exponential scaling to increase sensitivity
-    scaled_risk = min(1.0, total_risk * 1.5)  # Scale up risk score
+    # Apply progressive scaling
+    if total_risk > 0.6:
+        scaled_risk = min(1.0, total_risk * 1.5)
+    elif total_risk > 0.3:
+        scaled_risk = min(1.0, total_risk * 1.3)
+    else:
+        scaled_risk = total_risk
+
     return scaled_risk
 
 def compute_risk_score(session_id):
     """Compute comprehensive risk score using pattern analysis and Isolation Forest"""
     try:
-        # Get recent activity logs (last 30 seconds)
         recent_time = datetime.utcnow() - timedelta(seconds=30)
         recent_logs = ActivityLog.query.filter_by(session_id=session_id)\
             .filter(ActivityLog.timestamp >= recent_time)\
             .order_by(ActivityLog.timestamp.desc()).all()
 
         if not recent_logs:
-            return 0.0  # Default score when not enough data
+            return 0.0
 
-        # Analyze patterns
         patterns = analyze_activity_patterns(recent_logs)
         pattern_risk = calculate_risk_level(patterns)
 
-        # Train isolation forest for anomaly detection
         X = extract_features(recent_logs)
         iso_forest = IsolationForest(
             n_estimators=100,
-            contamination=0.2,  # Increased from 0.1 for more sensitivity
+            contamination=0.3,  # Increased sensitivity
             random_state=42
         )
         iso_forest.fit(X)
-        anomaly_score = -iso_forest.score_samples(X)[0]  # Convert to 0-1 scale
+        anomaly_score = -iso_forest.score_samples(X)[0]
 
-        # Combine pattern risk and anomaly detection with higher weight on patterns
-        final_score = 0.8 * pattern_risk + 0.2 * anomaly_score
-        final_score = min(1.0, max(0.0, final_score))  # Ensure score is between 0 and 1
+        # Weighted combination favoring pattern-based detection
+        final_score = 0.7 * pattern_risk + 0.3 * anomaly_score
+        final_score = min(1.0, max(0.0, final_score))
 
         logging.debug(f"Risk score computed: {final_score:.2f} (pattern: {pattern_risk:.2f}, anomaly: {anomaly_score:.2f})")
         return float(final_score)
 
     except Exception as e:
         logging.error(f"Error in compute_risk_score: {str(e)}")
-        return 0.0  # Return default score on error
+        return 0.0
 
 def extract_features(activity_logs):
     """Extract features from activity logs for anomaly detection"""
@@ -147,7 +140,6 @@ def extract_features(activity_logs):
         if not activity_logs:
             return np.zeros((1, 15))
 
-        # Basic features
         keystroke_intervals = []
         mouse_speeds = []
         right_clicks = []
@@ -155,7 +147,7 @@ def extract_features(activity_logs):
         suspicious_patterns = 0
 
         for log in activity_logs:
-            if not log.data:  # Skip if data is None
+            if not log.data:
                 continue
 
             if log.activity_type == 'keystroke':
@@ -184,7 +176,6 @@ def extract_features(activity_logs):
             elif log.activity_type == 'tabswitch':
                 tab_switches += 1
 
-        # Compute statistical features
         features = [
             np.mean(keystroke_intervals) if keystroke_intervals else 0,
             np.std(keystroke_intervals) if len(keystroke_intervals) > 1 else 0,
