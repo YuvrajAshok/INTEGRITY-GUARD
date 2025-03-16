@@ -39,10 +39,38 @@ class ExamMonitor {
 
             // Start periodic risk score updates
             this.startMonitoring();
-
         } catch (error) {
             console.error('Failed to initialize monitoring:', error);
             alert('Failed to start exam session. Please refresh the page or contact support.');
+        }
+    }
+
+    async submitExam() {
+        try {
+            const response = await fetch('/api/submit_exam', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    session_id: this.sessionId
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to submit exam');
+            }
+
+            // Clear monitoring and event listeners
+            if (this.monitoringInterval) {
+                clearInterval(this.monitoringInterval);
+            }
+
+            // Redirect to login page
+            window.location.href = '/login';
+        } catch (error) {
+            console.error('Failed to submit exam:', error);
+            alert('Failed to submit exam. Please try again.');
         }
     }
 
@@ -50,9 +78,7 @@ class ExamMonitor {
         if (this.monitoringInterval) {
             clearInterval(this.monitoringInterval);
         }
-
         this.resetCounters();
-
         // Start new monitoring interval (every 3 seconds)
         this.monitoringInterval = setInterval(() => {
             this.updateRiskScore();
@@ -315,9 +341,9 @@ class ExamMonitor {
             const percentage = (score * 100).toFixed(1);
             riskDisplay.textContent = `Risk Score: ${percentage}%`;
             riskDisplay.className = `risk-score ${
-                score > 0.7 ? 'high-risk' : 
-                score > 0.4 ? 'medium-risk' : 
-                'low-risk'
+                score > 0.7 ? 'high-risk' :
+                    score > 0.4 ? 'medium-risk' :
+                        'low-risk'
             }`;
         }
     }
@@ -365,7 +391,7 @@ class ExamMonitor {
     }
 }
 
-// Initialize monitoring when page loads
-document.addEventListener('DOMContentLoaded', () => {
+// Initialize monitoring when the page loads
+window.addEventListener('load', () => {
     window.examMonitor = new ExamMonitor();
 });
