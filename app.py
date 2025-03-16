@@ -201,81 +201,64 @@ def logout():
 
 @app.route('/api/active_sessions')
 def get_active_sessions():
-    try:
-        # Get all active exam sessions
-        active_sessions = ExamSession.query.filter_by(completed=False)\
-            .order_by(ExamSession.start_time.desc()).all()
+    # Get all active exam sessions
+    active_sessions = ExamSession.query.filter_by(completed=False)\
+        .order_by(ExamSession.start_time.desc()).all()
 
-        session_data = []
-        for exam_session in active_sessions:
-            # Get latest risk score
-            latest_score = RiskScore.query.filter_by(session_id=exam_session.id)\
-                .order_by(RiskScore.timestamp.desc()).first()
+    session_data = []
+    for session in active_sessions:
+        # Get latest risk score
+        latest_score = RiskScore.query.filter_by(session_id=session.id)\
+            .order_by(RiskScore.timestamp.desc()).first()
 
-            # Get recent suspicious activities
-            recent_logs = ActivityLog.query.filter_by(session_id=exam_session.id)\
-                .order_by(ActivityLog.timestamp.desc())\
-                .limit(5).all()
+        # Get recent suspicious activities
+        recent_logs = ActivityLog.query.filter_by(session_id=session.id)\
+            .order_by(ActivityLog.timestamp.desc())\
+            .limit(5).all()
 
-            # Get student info
-            student = User.query.get(exam_session.user_id)
+        # Get student info
+        student = User.query.get(session.user_id)
 
-            session_data.append({
-                'id': exam_session.id,
-                'username': student.username,
-                'start_time': exam_session.start_time.isoformat(),
-                'duration': int((datetime.utcnow() - exam_session.start_time).total_seconds()),
-                'risk_score': latest_score.score if latest_score else 0.0,
-                'mean_risk_score': exam_session.mean_risk_score,
-                'suspicious_activities': [
-                    {
-                        'type': log.activity_type,
-                        'timestamp': log.timestamp.isoformat(),
-                        'data': log.data
-                    } for log in recent_logs
-                ]
-            })
+        session_data.append({
+            'id': session.id,
+            'username': student.username,
+            'start_time': session.start_time.isoformat(),
+            'duration': int((datetime.utcnow() - session.start_time).total_seconds()),
+            'risk_score': latest_score.score if latest_score else 0.0,
+            'suspicious_activities': [
+                {
+                    'type': log.activity_type,
+                    'timestamp': log.timestamp.isoformat(),
+                    'data': log.data
+                } for log in recent_logs
+            ]
+        })
 
-        return jsonify(session_data)
-
-    except Exception as e:
-        logging.error(f"Error in get_active_sessions: {str(e)}")
-        return jsonify({'error': 'Internal server error'}), 500
+    return jsonify(session_data)
 
 @app.route('/api/end_session', methods=['POST'])
 def end_session():
-    try:
-        data = request.json
-        session_id = data.get('session_id')
+    data = request.json
+    session_id = data.get('session_id')
 
-        exam_session = ExamSession.query.get(session_id)
-        if not exam_session:
-            return jsonify({'error': 'Session not found'}), 404
+    exam_session = ExamSession.query.get(session_id)
+    if not exam_session:
+        return jsonify({'error': 'Session not found'}), 404
 
-        # Update session status
-        exam_session.end_time = datetime.utcnow()
-        exam_session.completed = True
+    exam_session.end_time = datetime.utcnow()
+    exam_session.completed = True
 
-        # Calculate final mean risk score
-        all_scores = RiskScore.query.filter_by(session_id=session_id).all()
-        if all_scores:
-            exam_session.mean_risk_score = sum(score.score for score in all_scores) / len(all_scores)
+    # Calculate final mean risk score
+    all_scores = RiskScore.query.filter_by(session_id=session_id).all()
+    if all_scores:
+        exam_session.mean_risk_score = sum(score.score for score in all_scores) / len(all_scores)
 
-        db.session.commit()
+    db.session.commit()
 
-        # Clear user session if it matches the ended exam session
-        if session.get('user_id') == exam_session.user_id:
-            session.clear()
-
-        return jsonify({
-            'status': 'completed',
-            'mean_risk_score': exam_session.mean_risk_score
-        })
-
-    except Exception as e:
-        logging.error(f"Error in end_session: {str(e)}")
-        db.session.rollback()
-        return jsonify({'error': 'Internal server error'}), 500
+    return jsonify({
+        'status': 'completed',
+        'mean_risk_score': exam_session.mean_risk_score
+    })
 
 with app.app_context():
     db.create_all()
