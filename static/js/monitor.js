@@ -39,6 +39,35 @@ class ExamMonitor {
 
             // Start periodic risk score updates
             this.startMonitoring();
+        } catch (error) {
+            console.error('Failed to initialize monitoring:', error);
+        }
+    }
+
+    async submitExam() {
+        try {
+            const response = await fetch('/api/submit_exam', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    session_id: this.sessionId
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to submit exam');
+            }
+
+            // Redirect to completion page or show success message
+            alert('Exam submitted successfully!');
+            window.location.href = '/';
+        } catch (error) {
+            console.error('Failed to submit exam:', error);
+            alert('Failed to submit exam. Please try again.');
+        }
+    }
 
         } catch (error) {
             console.error('Failed to initialize monitoring:', error);

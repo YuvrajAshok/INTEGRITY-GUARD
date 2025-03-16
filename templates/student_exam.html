@@ -14,7 +14,7 @@
         <div class="card-body">
             <h2 class="card-title">Sample Exam</h2>
             
-            <form id="exam-form" onsubmit="event.preventDefault(); window.examMonitor.submitExam();">
+            <form id="exam-form" onsubmit="event.preventDefault(); window.examMonitor && window.examMonitor.submitExam();">
                 <div class="mb-4">
                     <label class="form-label">Question 1:</label>
                     <p>Explain the concept of machine learning in your own words.</p>
