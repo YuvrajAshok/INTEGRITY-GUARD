@@ -8,6 +8,16 @@ import logging
 def analyze_activity_patterns(activity_logs):
     """Analyze activity patterns for suspicious behavior"""
     try:
+        if not activity_logs or len(activity_logs) < 2:
+            return {
+                'rapid_typing': 0,
+                'unusual_mouse': 0,
+                'tab_switches': 0,
+                'time_gaps': 0,
+                'right_clicks': 0,
+                'suspicious_patterns': 0
+            }
+            
         patterns = {
             'rapid_typing': 0,
             'unusual_mouse': 0,
@@ -108,12 +118,14 @@ def compute_risk_score(session_id):
             .filter(ActivityLog.timestamp >= recent_time)\
             .order_by(ActivityLog.timestamp.desc()).all()
 
-        if not recent_logs:
+        if not recent_logs or len(recent_logs) < 2:
             return 0.0
 
         patterns = analyze_activity_patterns(recent_logs)
+        if sum(patterns.values()) == 0:
+            return 0.0
+            
         pattern_risk = calculate_risk_level(patterns)
-
         X = extract_features(recent_logs)
         iso_forest = IsolationForest(
             n_estimators=100,
