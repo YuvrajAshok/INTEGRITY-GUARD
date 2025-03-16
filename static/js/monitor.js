@@ -8,6 +8,12 @@ class ExamMonitor {
         this.rightClickCount = 0;
         this.lastRightClickTime = Date.now();
         this.monitoringInterval = null;
+        this.suspiciousActivityCount = {
+            rapid_typing: 0,
+            unusual_mouse: 0,
+            tab_switches: 0,
+            right_clicks: 0
+        };
 
         this.initializeMonitoring();
     }
@@ -41,12 +47,10 @@ class ExamMonitor {
     }
 
     startMonitoring() {
-        // Clear any existing interval
         if (this.monitoringInterval) {
             clearInterval(this.monitoringInterval);
         }
 
-        // Reset counters
         this.resetCounters();
 
         // Start new monitoring interval (every 3 seconds)
@@ -60,6 +64,12 @@ class ExamMonitor {
         this.keyPressHistory = [];
         this.rightClickCount = 0;
         this.mousePoints = [];
+        this.suspiciousActivityCount = {
+            rapid_typing: 0,
+            unusual_mouse: 0,
+            tab_switches: 0,
+            right_clicks: 0
+        };
     }
 
     async logActivity(type, data) {
@@ -98,13 +108,18 @@ class ExamMonitor {
             this.keyPressHistory.shift();
         }
 
+        // Analyze typing patterns
         const patterns = this.analyzeTypingPatterns();
+        if (patterns.rapidKeystrokes > 0) {
+            this.suspiciousActivityCount.rapid_typing++;
+        }
 
         this.logActivity('keystroke', {
             key: event.key,
             keyInterval: keyInterval,
             timestamp: currentTime,
-            patterns: patterns
+            patterns: patterns,
+            suspicious_count: this.suspiciousActivityCount.rapid_typing
         });
 
         this.lastKeystrokeTime = currentTime;
@@ -155,16 +170,18 @@ class ExamMonitor {
             const points = this.mousePoints;
             this.mousePoints = [];
 
-            // Calculate mouse movement metrics
             const speed = this.calculateMouseSpeed(points);
-            const distance = this.calculateMouseDistance(points);
             const pattern = this.analyzeMousePattern(points);
+
+            if (speed > 1000 || pattern.isLinear || pattern.isCircular || pattern.suddenJumps > 0) {
+                this.suspiciousActivityCount.unusual_mouse++;
+            }
 
             this.logActivity('mouse', {
                 speed: speed,
-                distance: distance,
                 pattern: pattern,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                suspicious_count: this.suspiciousActivityCount.unusual_mouse
             });
         }
     }
@@ -173,12 +190,15 @@ class ExamMonitor {
         event.preventDefault();
         const currentTime = Date.now();
         const timeSinceLastClick = currentTime - this.lastRightClickTime;
-        this.rightClickCount++;
+
+        if (timeSinceLastClick < 200) {  // Rapid right clicks
+            this.suspiciousActivityCount.right_clicks++;
+        }
 
         this.logActivity('right_click', {
-            count: this.rightClickCount,
             timeSinceLastClick: timeSinceLastClick,
-            timestamp: currentTime
+            timestamp: currentTime,
+            suspicious_count: this.suspiciousActivityCount.right_clicks
         });
 
         this.lastRightClickTime = currentTime;
@@ -249,9 +269,12 @@ class ExamMonitor {
     }
 
     handleTabSwitch() {
+        this.suspiciousActivityCount.tab_switches++;
+
         this.logActivity('tabswitch', {
             hidden: document.hidden,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            suspicious_count: this.suspiciousActivityCount.tab_switches
         });
     }
 
@@ -289,8 +312,13 @@ class ExamMonitor {
     updateRiskDisplay(score) {
         const riskDisplay = document.getElementById('risk-score');
         if (riskDisplay) {
-            riskDisplay.textContent = `Risk Score: ${(score * 100).toFixed(1)}%`;
-            riskDisplay.className = `risk-score ${score > 0.7 ? 'high-risk' : score > 0.4 ? 'medium-risk' : 'low-risk'}`;
+            const percentage = (score * 100).toFixed(1);
+            riskDisplay.textContent = `Risk Score: ${percentage}%`;
+            riskDisplay.className = `risk-score ${
+                score > 0.7 ? 'high-risk' : 
+                score > 0.4 ? 'medium-risk' : 
+                'low-risk'
+            }`;
         }
     }
 

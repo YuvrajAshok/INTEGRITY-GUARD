@@ -64,43 +64,45 @@ def analyze_activity_patterns(activity_logs):
 
 def calculate_risk_level(patterns):
     """Calculate risk level based on frequency of suspicious activities"""
-    # Define thresholds for each pattern type
+    # Define thresholds for each pattern type - lowered thresholds for more sensitivity
     thresholds = {
-        'rapid_typing': {'low': 3, 'medium': 6, 'high': 10},
-        'unusual_mouse': {'low': 2, 'medium': 5, 'high': 8},
-        'tab_switches': {'low': 2, 'medium': 4, 'high': 6},
-        'time_gaps': {'low': 1, 'medium': 3, 'high': 5},
-        'right_clicks': {'low': 2, 'medium': 4, 'high': 6},
-        'suspicious_patterns': {'low': 1, 'medium': 3, 'high': 5}
+        'rapid_typing': {'low': 2, 'medium': 4, 'high': 6},
+        'unusual_mouse': {'low': 1, 'medium': 3, 'high': 5},
+        'tab_switches': {'low': 1, 'medium': 2, 'high': 4},
+        'time_gaps': {'low': 1, 'medium': 2, 'high': 3},
+        'right_clicks': {'low': 1, 'medium': 3, 'high': 5},
+        'suspicious_patterns': {'low': 1, 'medium': 2, 'high': 3}
     }
 
-    # Calculate risk level for each pattern
+    # Calculate risk level for each pattern with higher risk values
     risk_levels = {}
     for pattern, count in patterns.items():
         if pattern in thresholds:
             if count >= thresholds[pattern]['high']:
                 risk_levels[pattern] = 1.0  # High risk
             elif count >= thresholds[pattern]['medium']:
-                risk_levels[pattern] = 0.6  # Medium risk
+                risk_levels[pattern] = 0.7  # Medium risk (increased from 0.6)
             elif count >= thresholds[pattern]['low']:
-                risk_levels[pattern] = 0.3  # Low risk
+                risk_levels[pattern] = 0.4  # Low risk (increased from 0.3)
             else:
                 risk_levels[pattern] = 0.0  # No risk
 
-    # Calculate weighted average risk score
+    # Calculate weighted average risk score with adjusted weights
     weights = {
-        'rapid_typing': 0.2,
-        'unusual_mouse': 0.2,
+        'rapid_typing': 0.25,
+        'unusual_mouse': 0.25,
         'tab_switches': 0.15,
         'time_gaps': 0.15,
-        'right_clicks': 0.15,
-        'suspicious_patterns': 0.15
+        'right_clicks': 0.10,
+        'suspicious_patterns': 0.10
     }
 
     total_risk = sum(risk_levels[pattern] * weights[pattern] 
                     for pattern in risk_levels.keys())
 
-    return total_risk
+    # Apply exponential scaling to increase sensitivity
+    scaled_risk = min(1.0, total_risk * 1.5)  # Scale up risk score
+    return scaled_risk
 
 def compute_risk_score(session_id):
     """Compute comprehensive risk score using pattern analysis and Isolation Forest"""
@@ -122,14 +124,14 @@ def compute_risk_score(session_id):
         X = extract_features(recent_logs)
         iso_forest = IsolationForest(
             n_estimators=100,
-            contamination=0.1,
+            contamination=0.2,  # Increased from 0.1 for more sensitivity
             random_state=42
         )
         iso_forest.fit(X)
         anomaly_score = -iso_forest.score_samples(X)[0]  # Convert to 0-1 scale
 
-        # Combine pattern risk and anomaly detection
-        final_score = 0.7 * pattern_risk + 0.3 * anomaly_score
+        # Combine pattern risk and anomaly detection with higher weight on patterns
+        final_score = 0.8 * pattern_risk + 0.2 * anomaly_score
         final_score = min(1.0, max(0.0, final_score))  # Ensure score is between 0 and 1
 
         logging.debug(f"Risk score computed: {final_score:.2f} (pattern: {pattern_risk:.2f}, anomaly: {anomaly_score:.2f})")
